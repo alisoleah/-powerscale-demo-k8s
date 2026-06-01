@@ -49,7 +49,7 @@
         # Ensure you have pushed your repository to this URL!
         scm_url: "https://github.com/alisoleah/-powerscale-demo-k8s.git" # Update 'galala' if your GitHub username is different
         scm_update_on_launch: true
-        update_project: false
+        # update_project: false
 
     - name: 5. Create Failover Job Template
       job_template:

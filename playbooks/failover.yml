@@ -1,0 +1,32 @@
+---
+- name: EXECUTE TARGET FAILOVER - PowerScale SyncIQ
+  hosts: all
+  connection: local
+  gather_facts: false
+  
+  vars:
+    # AWX will inject these dynamically at runtime, but we set defaults for testing
+    isilon_host: "{{ target_cluster | default('site-b.isilon.local') }}"
+    policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
+
+  tasks:
+    - name: 1. Confirm Target Cluster Connectivity
+      dellemc.powerscale.info:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user }}"
+        api_password: "{{ ansible_password }}"
+      register: onefs_info
+
+    - name: 2. Display Cluster Information
+      debug:
+        msg: "Successfully connected to {{ onefs_info.Cluster_Info.name }}. Running OneFS version {{ onefs_info.Cluster_Info.version }}"
+
+    - name: 3. Execute SyncIQ 'Allow Write' (Failover) on Target Policy
+      dellemc.powerscale.synciq_target_policy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        state: "allow_write"

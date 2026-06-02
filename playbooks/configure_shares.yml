@@ -30,9 +30,8 @@
         quota_type: "directory"
         path: "/ifs/data/source"
         quota:
-          thresholds:
-            hard: 5368709120 # 5GB in Bytes
-          enforced: true
+          hard_limit_size: 1
+          cap_unit: "GB"
         state: "present"
 
     - name: 2. Apply 5GB SmartQuota to Target (Site B)
@@ -44,9 +43,8 @@
         quota_type: "directory"
         path: "/ifs/data/target"
         quota:
-          thresholds:
-            hard: 5368709120 # 5GB in Bytes
-          enforced: true
+          hard_limit_size: 1
+          cap_unit: "GB"
         state: "present"
     # ---------------------------------------------------------------
     # NFS EXPORTS (For Linux/Kubernetes Clients)

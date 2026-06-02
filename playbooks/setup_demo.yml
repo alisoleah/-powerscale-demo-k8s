@@ -30,6 +30,12 @@
         api_user: "{{ api_user }}"
         api_password: "{{ api_password }}"
         path: "/ifs/data/source"
+        owner:
+          name: "root"
+          provider_type: "local"
+        group:
+          name: "wheel"
+          provider_type: "local"
         access_control: "0755"
         recursive: true
         state: "present"
@@ -41,6 +47,12 @@
         api_user: "{{ api_user }}"
         api_password: "{{ api_password }}"
         path: "/ifs/data/target"
+        owner:
+          name: "root"
+          provider_type: "local"
+        group:
+          name: "wheel"
+          provider_type: "local"
         access_control: "0755"
         recursive: true
         state: "present"

@@ -55,8 +55,7 @@
         verify_ssl: false
         api_user: "{{ api_user }}"
         api_password: "{{ api_password }}"
-        paths: 
-          - "/ifs/data/source"
+        path: "/ifs/data/source"
         description: "Primary Data Center NFS"
         state: "present"
 
@@ -66,8 +65,7 @@
         verify_ssl: false
         api_user: "{{ api_user }}"
         api_password: "{{ api_password }}"
-        paths: 
-          - "/ifs/data/target"
+        path: "/ifs/data/target"
         description: "Standby Data Center NFS (Read-Only until Failover)"
         state: "present"
 

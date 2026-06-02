@@ -79,9 +79,19 @@
 
     # ---------------------------------------------------------------
     # STEP 3: resync_prep clears the Conflicted state left by allow_write
-    # This MUST run before a normal 'run' job after a failover
+    # Policy may be auto-disabled after a failed job — re-enable first
     # ---------------------------------------------------------------
-    - name: 3. SyncIQ Resync Prep (resolve conflicted state)
+    - name: 3a. Enable SyncIQ policy (may be disabled after error state)
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        enabled: true
+        state: "present"
+
+    - name: 3b. SyncIQ Resync Prep (resolve conflicted state)
       dellemc.powerscale.synciqpolicy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -94,7 +104,7 @@
         state: "present"
 
     # Poll every 10s until no active job exists for this policy (404 = done)
-    - name: 3b. Wait for resync_prep to finish before starting sync
+    - name: 3c. Wait for resync_prep to finish before starting sync
       uri:
         url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs/{{ policy_name }}"
         method: GET

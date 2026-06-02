@@ -121,3 +121,17 @@
         controller_username: "{{ awx_username }}"
         controller_password: "{{ awx_password }}"
 
+    - name: 9. Create Lab Reset Job Template
+      awx.awx.job_template:
+        name: "DANGER: Reset Lab (Nuke & Pave)"
+        job_type: run
+        inventory: "PowerScale Demo Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/reset_lab.yml"
+        credentials:
+          - "PowerScale_API_Creds"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+

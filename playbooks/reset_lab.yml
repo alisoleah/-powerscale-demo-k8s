@@ -1,0 +1,89 @@
+---
+- name: RESET LAB - Nuke and Pave Environment
+  hosts: all
+  connection: local
+  gather_facts: false
+
+  vars:
+    isilon_host: "{{ inventory_hostname }}"
+    policy_name: "NFS_Demo_Policy"
+    api_user: "{{ ansible_user | default('root') }}"
+    api_password: "{{ ansible_password }}"
+
+  # ---------------------------------------------------------------
+  # DYNAMIC DEPENDENCY INSTALLATION
+  # ---------------------------------------------------------------
+  pre_tasks:
+    - name: Ensure PowerScale Python SDK is installed in AWX runner
+      ansible.builtin.pip:
+        name: "isilon-sdk"
+        state: present
+
+  tasks:
+    # ---------------------------------------------------------------
+    # TEARDOWN PHASE 1: Network Protocols (SMB & NFS)
+    # ---------------------------------------------------------------
+    - name: 1. Delete SMB Shares
+      dellemc.powerscale.smb:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        share_name: "{{ item }}"
+        state: "absent"
+      loop:
+        - "Site_A_Primary"
+        - "Site_B_Recovery"
+
+    - name: 2. Delete NFS Exports
+      dellemc.powerscale.nfs:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        path: "{{ item }}"
+        state: "absent"
+      loop:
+        - "/ifs/data/source"
+        - "/ifs/data/target"
+
+    # ---------------------------------------------------------------
+    # TEARDOWN PHASE 2: Quotas and Policies
+    # ---------------------------------------------------------------
+    - name: 3. Delete 5GB SmartQuotas
+      dellemc.powerscale.smartquota:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        path: "{{ item }}"
+        quota_type: "directory"
+        state: "absent"
+      loop:
+        - "/ifs/data/source"
+        - "/ifs/data/target"
+
+    - name: 4. Delete SyncIQ Policy
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        policy_name: "{{ policy_name }}"
+        state: "absent"
+
+    # ---------------------------------------------------------------
+    # TEARDOWN PHASE 3: Physical Data Destruction
+    # ---------------------------------------------------------------
+    - name: 5. Erase Underlying Directories and All Contents
+      dellemc.powerscale.filesystem:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        path: "{{ item }}"
+        recursive_force_delete: true
+        state: "absent"
+      loop:
+        - "/ifs/data/source"
+        - "/ifs/data/target"

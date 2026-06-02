@@ -102,6 +102,10 @@
           action: "resync_prep"
           wait_for_completion: true
         state: "present"
+      register: resync_result
+      failed_when:
+        - resync_result.failed
+        - "'already done' not in (resync_result.msg | default(''))"
 
     # ---------------------------------------------------------------
     # STEP 4: Now safe to run the sync to re-mirror Site A → Site B

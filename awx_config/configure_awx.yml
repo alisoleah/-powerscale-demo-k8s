@@ -105,4 +105,3 @@
         controller_host: "{{ awx_host }}"
         controller_username: "{{ awx_username }}"
         controller_password: "{{ awx_password }}"
----

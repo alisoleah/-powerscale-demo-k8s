@@ -90,8 +90,26 @@
         policy_name: "{{ policy_name }}"
         job_params:
           action: "resync_prep"
-          wait_for_completion: true
+          wait_for_completion: false
         state: "present"
+
+    # Poll every 10s until no active job exists for this policy (404 = done)
+    - name: 3b. Wait for resync_prep to finish before starting sync
+      uri:
+        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs/{{ policy_name }}"
+        method: GET
+        user: "{{ ansible_user | default('root') }}"
+        password: "{{ ansible_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: [200, 404]
+      register: resync_job_status
+      until: >
+        resync_job_status.status == 404 or
+        (resync_job_status.json.jobs is defined and
+         resync_job_status.json.jobs | length == 0)
+      retries: 30
+      delay: 10
 
     # ---------------------------------------------------------------
     # STEP 4: Now safe to run the sync to re-mirror Site A → Site B

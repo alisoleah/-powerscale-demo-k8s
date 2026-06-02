@@ -1,0 +1,84 @@
+---
+- name: SETUP LOOPBACK SYNCIQ DEMO - PowerScale
+  hosts: all
+  connection: local
+  gather_facts: false
+
+  vars:
+    isilon_host: "{{ inventory_hostname }}"
+    policy_name: "NFS_Demo_Policy"
+    api_user: "{{ ansible_user | default('root') }}"
+    api_password: "{{ ansible_password }}"
+
+  tasks:
+    # ---------------------------------------------------------------
+    # STEP 1 & 2: Create source and target directories
+    # ---------------------------------------------------------------
+    - name: 1. Create /ifs/data/source directory
+      dellemc.powerscale.filesystem:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        path: "/ifs/data/source"
+        access_control: "0755"
+        recursive: true
+        state: "present"
+
+    - name: 2. Create /ifs/data/target directory
+      dellemc.powerscale.filesystem:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        path: "/ifs/data/target"
+        access_control: "0755"
+        recursive: true
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # STEP 3: Create the loopback SyncIQ policy
+    # source_cluster and target_cluster are nested dicts per Dell docs
+    # ---------------------------------------------------------------
+    - name: 3. Create SyncIQ loopback policy (NFS_Demo_Policy)
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        policy_name: "{{ policy_name }}"
+        action: "sync"
+        description: "Loopback demo policy for failover pipeline testing"
+        enabled: true
+        source_cluster:
+          source_root_path: "/ifs/data/source"
+        target_cluster:
+          target_host: "127.0.0.1"
+          target_path: "/ifs/data/target"
+        state: "present"
+      register: policy_result
+
+    - name: 3b. Confirm policy created
+      debug:
+        msg: "SyncIQ policy '{{ policy_name }}' created. Source=/ifs/data/source → Target=127.0.0.1:/ifs/data/target"
+
+    # ---------------------------------------------------------------
+    # STEP 4: Trigger and wait for the baseline sync job
+    # job_params.action: "run" matches Dell official example
+    # ---------------------------------------------------------------
+    - name: 4. Run baseline sync job and wait for completion
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        policy_name: "{{ policy_name }}"
+        job_params:
+          action: "run"
+          wait_for_completion: true
+        state: "present"
+      register: job_result
+
+    - name: 5. Confirm baseline sync complete
+      debug:
+        msg: "SETUP COMPLETE: Baseline sync finished. Policy '{{ policy_name }}' is ready. You can now run the failover playbook."

@@ -3,10 +3,10 @@
   hosts: all
   connection: local
   gather_facts: false
-  
+
   vars:
-    # AWX will inject these dynamically at runtime, but we set defaults for testing
-    isilon_host: "{{ target_cluster | default('site-b.isilon.local') }}"
+    # AWX injects these dynamically via the Launch Survey
+    isilon_host: "{{ target_cluster | default(inventory_hostname) }}"
     policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
 
   tasks:
@@ -14,19 +14,28 @@
       dellemc.powerscale.info:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
-        api_user: "{{ ansible_user }}"
+        api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
       register: onefs_info
 
     - name: 2. Display Cluster Information
       debug:
         msg: "Successfully connected to {{ onefs_info.Cluster_Info.name }}. Running OneFS version {{ onefs_info.Cluster_Info.version }}"
+      when: onefs_info is defined and onefs_info.Cluster_Info is defined
 
-    - name: 3. Execute SyncIQ 'Allow Write' (Failover) on Target Policy
-      dellemc.powerscale.synciq_target_policy:
+    - name: 3. Execute SyncIQ 'Allow Write' (Failover) on Policy
+      dellemc.powerscale.synciqpolicy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
-        api_user: "{{ ansible_user }}"
+        api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
         policy_name: "{{ policy_name }}"
-        state: "allow_write"
+        job_params:
+          action: "allow_write"
+          wait_for_completion: true
+        state: "present"
+      register: failover_result
+
+    - name: 4. Confirm Failover Success
+      debug:
+        msg: "FAILOVER COMPLETE: Policy '{{ policy_name }}' on {{ isilon_host }} is now in ALLOW_WRITE state. Target is live."

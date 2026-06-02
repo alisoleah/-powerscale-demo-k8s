@@ -8,9 +8,9 @@
 
   vars:
     # Update these three variables with your Minikube deployment details!
-    controller_host: "http://127.0.0.1:41839"
+    controller_host: "http://127.0.0.1:32825"
     controller_username: "admin"
-    controller_password: ""
+    controller_password: "Kvkp8Xp1x7Z4usCQSLVCJ79lf1FIbk2J"
     controller_validate_certs: false
 
   environment:

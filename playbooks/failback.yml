@@ -32,7 +32,24 @@
               name: "Everyone"
         state: "present"
 
-    - name: 2. Re-establish SyncIQ Mirror (Resync Prep / Baseline)
+    - name: 2. Fence Site B (Lock Recovery Share to Read-Only)
+      dellemc.powerscale.smb:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        share_name: "Site_B_Recovery"
+        path: "/ifs/data/target"
+        description: "Standby Windows Share (Read-Only until Failover)"
+        permissions:
+          - permission: "read"
+            permission_type: "allow"
+            trustee:
+              type: "wellknown"
+              name: "Everyone"
+        state: "present"
+
+    - name: 3. Re-establish SyncIQ Mirror (Resync Prep / Baseline)
       dellemc.powerscale.synciqpolicy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false

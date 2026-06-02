@@ -1,0 +1,117 @@
+---
+- name: CONFIGURE SHARES AND QUOTAS - PowerScale
+  hosts: all
+  connection: local
+  gather_facts: false
+
+  vars:
+    isilon_host: "{{ inventory_hostname }}"
+    api_user: "{{ ansible_user | default('root') }}"
+    api_password: "{{ ansible_password }}"
+
+  tasks:
+    # ---------------------------------------------------------------
+    # SMARTQUOTAS (5GB Limits)
+    # ---------------------------------------------------------------
+    - name: 1. Apply 5GB SmartQuota to Source (Site A)
+      dellemc.powerscale.smartquota:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        quota_type: "directory"
+        path: "/ifs/data/source"
+        thresholds:
+          hard: 5368709120 # 5GB in Bytes
+        enforced: true
+        state: "present"
+
+    - name: 2. Apply 5GB SmartQuota to Target (Site B)
+      dellemc.powerscale.smartquota:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        quota_type: "directory"
+        path: "/ifs/data/target"
+        thresholds:
+          hard: 5368709120 # 5GB in Bytes
+        enforced: true
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # NFS EXPORTS (For Linux/Kubernetes Clients)
+    # ---------------------------------------------------------------
+    - name: 3. Create Source NFS Export (Site A)
+      dellemc.powerscale.nfs:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        paths: 
+          - "/ifs/data/source"
+        description: "Primary Data Center NFS"
+        state: "present"
+
+    - name: 4. Create Target NFS Export (Site B)
+      dellemc.powerscale.nfs:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        paths: 
+          - "/ifs/data/target"
+        description: "Standby Data Center NFS (Read-Only until Failover)"
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # SMB SHARES (For Windows Clients)
+    # ---------------------------------------------------------------
+    - name: 5. Create Source SMB Share (Site A)
+      dellemc.powerscale.smb:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        share_name: "Site_A_Primary"
+        path: "/ifs/data/source"
+        description: "Primary Windows Share"
+        permissions:
+          - permission: "full"
+            permission_type: "allow"
+            trustee:
+              type: "wellknown"
+              name: "Everyone"
+        state: "present"
+
+    - name: 6. Create Target SMB Share (Site B)
+      dellemc.powerscale.smb:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        share_name: "Site_B_Recovery"
+        path: "/ifs/data/target"
+        description: "Standby Windows Share (Read-Only until Failover)"
+        permissions:
+          - permission: "full"
+            permission_type: "allow"
+            trustee:
+              type: "wellknown"
+              name: "Everyone"
+        state: "present"
+
+    - name: 7. Create Shares & Quotas Job Template
+      awx.awx.job_template:
+        name: "SETUP: PowerScale Shares and Quotas"
+        job_type: run
+        inventory: "PowerScale Demo Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/configure_shares.yml"
+        credentials:
+          - "PowerScale_API_Creds"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+---

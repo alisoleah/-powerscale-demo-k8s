@@ -7,59 +7,87 @@
     - awx.awx
 
   vars:
-    # Update these three variables with your Minikube deployment details!
-    controller_host: "http://127.0.0.1:32825"
-    controller_username: "admin"
-    controller_password: "Kvkp8Xp1x7Z4usCQSLVCJ79lf1FIbk2J"
+    # --- UPDATE THESE 4 VARIABLES BEFORE RUNNING ---
+    awx_host: "http://127.0.0.1:32825" 
+    awx_password: "Kvkp8Xp1x7Z4usCQSLVCJ79lf1FIbk2J"
+    isilon_password: "dell1234"
     controller_validate_certs: false
-
-  environment:
-    CONTROLLER_HOST: "{{ controller_host }}"
-    CONTROLLER_USERNAME: "{{ controller_username }}"
-    CONTROLLER_PASSWORD: "{{ controller_password }}"
-    CONTROLLER_VERIFY_SSL: "{{ controller_validate_certs | string }}"
+    github_repo: "https://github.com/alisoleah/-powerscale-demo-k8s.git"
+    
+    awx_username: "admin"
 
   tasks:
     - name: 1. Create PowerScale Machine Credential
-      credential:
+      awx.awx.credential:
         name: "PowerScale_API_Creds"
         credential_type: "Machine"
         organization: "Default"
         inputs:
           username: "root"
-          password: "YourPowerScalePassword" # Update when you build the real PowerScale 
+          password: "{{ isilon_password }}"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
 
     - name: 2. Create Demo Inventory
-      inventory:
+      awx.awx.inventory:
         name: "PowerScale Demo Inventory"
         organization: "Default"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
 
     - name: 3. Add PowerScale Clusters to Inventory
-      host:
-        name: "site-b.isilon.local" # The target cluster we will fail over to
+      awx.awx.host:
+        name: "192.168.243.50"
         inventory: "PowerScale Demo Inventory"
         variables:
-          ansible_connection: local # PowerScale modules use REST API locally from AWX
+          ansible_connection: local
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
 
     - name: 4. Create GitHub Project for Payload
-      project:
+      awx.awx.project:
         name: "PowerScale Failover Playbooks"
         organization: "Default"
         scm_type: git
-        # Ensure you have pushed your repository to this URL!
-        scm_url: "https://github.com/alisoleah/-powerscale-demo-k8s.git" # Update 'galala' if your GitHub username is different
+        scm_url: "{{ github_repo }}"
         scm_update_on_launch: true
-        # update_project: false
+        update_project: true
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
 
     - name: 5. Create Failover Job Template
-      job_template:
+      awx.awx.job_template:
         name: "EXECUTE: Site A to Site B NFS Failover"
-        project: "PowerScale Failover Playbooks"
+        job_type: run
         inventory: "PowerScale Demo Inventory"
+        project: "PowerScale Failover Playbooks"
         playbook: "playbooks/failover.yml"
         credentials:
           - "PowerScale_API_Creds"
         ask_variables_on_launch: true
-        extra_vars:
-          target_cluster: "site-b.isilon.local"
-          synciq_policy: "NFS_Demo_Policy"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 6. Create Setup Job Template
+      awx.awx.job_template:
+        name: "SETUP: PowerScale Loopback Demo"
+        job_type: run
+        inventory: "PowerScale Demo Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/setup_demo.yml"
+        credentials:
+          - "PowerScale_API_Creds"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"

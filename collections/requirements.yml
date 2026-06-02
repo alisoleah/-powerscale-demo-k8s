@@ -1,3 +1,4 @@
 ---
 collections:
   - name: dellemc.powerscale
+    version: "==3.9.1"

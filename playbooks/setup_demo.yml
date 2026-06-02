@@ -10,6 +10,15 @@
     api_user: "{{ ansible_user | default('root') }}"
     api_password: "{{ ansible_password }}"
 
+  # ---------------------------------------------------------------
+  # DYNAMIC DEPENDENCY INSTALLATION
+  # ---------------------------------------------------------------
+  pre_tasks:
+    - name: Ensure PowerScale Python SDK is installed in AWX runner
+      ansible.builtin.pip:
+        name: "isilon-sdk"
+        state: present
+
   tasks:
     # ---------------------------------------------------------------
     # STEP 1 & 2: Create source and target directories
@@ -38,7 +47,6 @@
 
     # ---------------------------------------------------------------
     # STEP 3: Create the loopback SyncIQ policy
-    # source_cluster and target_cluster are nested dicts per Dell docs
     # ---------------------------------------------------------------
     - name: 3. Create SyncIQ loopback policy (NFS_Demo_Policy)
       dellemc.powerscale.synciqpolicy:
@@ -64,7 +72,6 @@
 
     # ---------------------------------------------------------------
     # STEP 4: Trigger and wait for the baseline sync job
-    # job_params.action: "run" matches Dell official example
     # ---------------------------------------------------------------
     - name: 4. Run baseline sync job and wait for completion
       dellemc.powerscale.synciqpolicy:

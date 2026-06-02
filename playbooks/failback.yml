@@ -45,6 +45,19 @@
           action: "allow_write_revert"
           wait_for_completion: true
         state: "present"
+      register: revert_result
+      failed_when:
+        - revert_result.failed
+        - "'already started' not in (revert_result.msg | default(''))"
+        - "'already done' not in (revert_result.msg | default(''))"
+
+    - name: 2b. Warn if revert was skipped (policy needs manual reset)
+      debug:
+        msg: >
+          WARNING: allow_write_revert skipped — policy was already in failback state.
+          If permissions do not restore correctly, run on Isilon CLI:
+          isi sync policies reset {{ policy_name }}
+      when: revert_result.failed | default(false)
 
     # ---------------------------------------------------------------
     # STEP 3: Set NFS + SMB permissions to match restored state

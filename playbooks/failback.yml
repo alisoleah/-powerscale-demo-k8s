@@ -7,6 +7,9 @@
   vars:
     isilon_host: "{{ target_cluster | default(inventory_hostname) }}"
     policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
+    # NFS export IDs from: isi nfs exports list
+    nfs_export_id_source: 1
+    nfs_export_id_target: 2
 
   pre_tasks:
     - name: Ensure PowerScale Python SDK is installed in AWX runner
@@ -41,7 +44,7 @@
         verify_ssl: false
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
-        path: "/ifs/data/source"
+        export_id: "{{ nfs_export_id_source }}"
         access_zone: "System"
         read_only: false
         state: "present"
@@ -72,15 +75,31 @@
         verify_ssl: false
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
-        path: "/ifs/data/target"
+        export_id: "{{ nfs_export_id_target }}"
         access_zone: "System"
         read_only: true
         state: "present"
 
     # ---------------------------------------------------------------
-    # STEP 3: Re-establish SyncIQ mirror — sync from Site A back to Site B
+    # STEP 3: resync_prep clears the Conflicted state left by allow_write
+    # This MUST run before a normal 'run' job after a failover
     # ---------------------------------------------------------------
-    - name: 3. Re-establish SyncIQ Mirror (run baseline sync)
+    - name: 3. SyncIQ Resync Prep (resolve conflicted state)
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        job_params:
+          action: "resync_prep"
+          wait_for_completion: true
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # STEP 4: Now safe to run the sync to re-mirror Site A → Site B
+    # ---------------------------------------------------------------
+    - name: 4. Re-establish SyncIQ Mirror (run sync)
       dellemc.powerscale.synciqpolicy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -93,9 +112,9 @@
         state: "present"
 
     # ---------------------------------------------------------------
-    # STEP 4: Final confirmation for demo audience
+    # STEP 5: Final confirmation for demo audience
     # ---------------------------------------------------------------
-    - name: 4. Confirm Failback Complete
+    - name: 5. Confirm Failback Complete
       debug:
         msg:
           - "FAILBACK COMPLETE"

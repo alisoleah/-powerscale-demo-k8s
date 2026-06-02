@@ -7,6 +7,9 @@
   vars:
     isilon_host: "{{ target_cluster | default(inventory_hostname) }}"
     policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
+    # NFS export IDs from: isi nfs exports list
+    nfs_export_id_source: 1
+    nfs_export_id_target: 2
 
   pre_tasks:
     - name: Ensure PowerScale Python SDK is installed in AWX runner
@@ -70,7 +73,7 @@
         verify_ssl: false
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
-        path: "/ifs/data/source"
+        export_id: "{{ nfs_export_id_source }}"
         access_zone: "System"
         read_only: true
         state: "present"
@@ -101,7 +104,7 @@
         verify_ssl: false
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
-        path: "/ifs/data/target"
+        export_id: "{{ nfs_export_id_target }}"
         access_zone: "System"
         read_only: false
         state: "present"

@@ -32,10 +32,10 @@
         path: "/ifs/data/source"
         owner:
           name: "root"
-          provider_type: "local"
+          provider_type: "file"
         group:
           name: "wheel"
-          provider_type: "local"
+          provider_type: "file"
         access_control: "0755"
         recursive: true
         state: "present"
@@ -49,10 +49,10 @@
         path: "/ifs/data/target"
         owner:
           name: "root"
-          provider_type: "local"
+          provider_type: "file"
         group:
           name: "wheel"
-          provider_type: "local"
+          provider_type: "file"
         access_control: "0755"
         recursive: true
         state: "present"

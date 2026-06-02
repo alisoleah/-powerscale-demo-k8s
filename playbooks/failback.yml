@@ -16,9 +16,54 @@
 
   tasks:
     # ---------------------------------------------------------------
-    # STEP 1: Un-fence Site A — restore source to READ-WRITE (SMB + NFS)
+    # STEP 1: SyncIQ work FIRST — resync_prep + run
+    # Must complete before setting permissions so the sync engine
+    # cannot override the NFS/SMB state we set afterward
     # ---------------------------------------------------------------
-    - name: 1a. Un-Fence Site A - Restore SMB Share to Full Write
+    - name: 1. Enable SyncIQ policy (may be disabled after error state)
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        enabled: true
+        state: "present"
+
+    - name: 2. SyncIQ Resync Prep (resolve conflicted state)
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        job_params:
+          action: "resync_prep"
+          wait_for_completion: true
+        state: "present"
+      register: resync_result
+      failed_when:
+        - resync_result.failed
+        - "'already done' not in (resync_result.msg | default(''))"
+
+    - name: 3. Re-establish SyncIQ Mirror (run sync)
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        job_params:
+          action: "run"
+          wait_for_completion: true
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # STEP 2: Set permissions AFTER sync completes
+    # SyncIQ engine marks the sync target read-only while running —
+    # setting permissions last ensures the final state is correct
+    # ---------------------------------------------------------------
+    - name: 4a. Un-Fence Site A - Restore SMB Share to Full Write
       dellemc.powerscale.smb:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -35,7 +80,7 @@
               name: "Everyone"
         state: "present"
 
-    - name: 1b. Un-Fence Site A - Restore NFS Export to Read-Write
+    - name: 4b. Un-Fence Site A - Restore NFS Export to Read-Write
       dellemc.powerscale.nfs:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -46,10 +91,7 @@
         read_only: false
         state: "present"
 
-    # ---------------------------------------------------------------
-    # STEP 2: Fence Site B — lock target back to READ-ONLY (SMB + NFS)
-    # ---------------------------------------------------------------
-    - name: 2a. Fence Site B - Lock SMB Share to Read-Only
+    - name: 5a. Fence Site B - Lock SMB Share to Read-Only
       dellemc.powerscale.smb:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -66,7 +108,7 @@
               name: "Everyone"
         state: "present"
 
-    - name: 2b. Fence Site B - Lock NFS Export to Read-Only
+    - name: 5b. Fence Site B - Lock NFS Export to Read-Only
       dellemc.powerscale.nfs:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -78,54 +120,9 @@
         state: "present"
 
     # ---------------------------------------------------------------
-    # STEP 3: resync_prep clears the Conflicted state left by allow_write
-    # Policy may be auto-disabled after a failed job — re-enable first
+    # STEP 3: Final confirmation for demo audience
     # ---------------------------------------------------------------
-    - name: 3a. Enable SyncIQ policy (may be disabled after error state)
-      dellemc.powerscale.synciqpolicy:
-        onefs_host: "{{ isilon_host }}"
-        verify_ssl: false
-        api_user: "{{ ansible_user | default('root') }}"
-        api_password: "{{ ansible_password }}"
-        policy_name: "{{ policy_name }}"
-        enabled: true
-        state: "present"
-
-    - name: 3b. SyncIQ Resync Prep (resolve conflicted state)
-      dellemc.powerscale.synciqpolicy:
-        onefs_host: "{{ isilon_host }}"
-        verify_ssl: false
-        api_user: "{{ ansible_user | default('root') }}"
-        api_password: "{{ ansible_password }}"
-        policy_name: "{{ policy_name }}"
-        job_params:
-          action: "resync_prep"
-          wait_for_completion: true
-        state: "present"
-      register: resync_result
-      failed_when:
-        - resync_result.failed
-        - "'already done' not in (resync_result.msg | default(''))"
-
-    # ---------------------------------------------------------------
-    # STEP 4: Now safe to run the sync to re-mirror Site A → Site B
-    # ---------------------------------------------------------------
-    - name: 4. Re-establish SyncIQ Mirror (run sync)
-      dellemc.powerscale.synciqpolicy:
-        onefs_host: "{{ isilon_host }}"
-        verify_ssl: false
-        api_user: "{{ ansible_user | default('root') }}"
-        api_password: "{{ ansible_password }}"
-        policy_name: "{{ policy_name }}"
-        job_params:
-          action: "run"
-          wait_for_completion: true
-        state: "present"
-
-    # ---------------------------------------------------------------
-    # STEP 5: Final confirmation for demo audience
-    # ---------------------------------------------------------------
-    - name: 5. Confirm Failback Complete
+    - name: 6. Confirm Failback Complete
       debug:
         msg:
           - "FAILBACK COMPLETE"

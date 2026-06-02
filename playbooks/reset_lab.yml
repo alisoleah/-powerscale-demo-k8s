@@ -62,6 +62,7 @@
       loop:
         - "/ifs/data/source"
         - "/ifs/data/target"
+      ignore_errors: true  # In case policy doesn't exist, continue with lab reset
 
     - name: 4. Delete SyncIQ Policy
       dellemc.powerscale.synciqpolicy:
@@ -71,6 +72,8 @@
         api_password: "{{ api_password }}"
         policy_name: "{{ policy_name }}"
         state: "absent"
+        ignore_errors: true  # In case policy doesn't exist, continue with lab reset
+
 
     # ---------------------------------------------------------------
     # TEARDOWN PHASE 3: Physical Data Destruction

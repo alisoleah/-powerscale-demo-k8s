@@ -24,11 +24,13 @@
         verify_ssl: false
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
+        gather_subset: 
+          - "cluster_identity"
       register: onefs_info
 
     - name: 2. Display Cluster Information
       debug:
-        msg: "Successfully connected to {{ onefs_info.Cluster_Info.name }}. Running OneFS version {{ onefs_info.Cluster_Info.version }}"
+        msg: "Successfully connected to Isilon target at {{ isilon_host }}. Proceeding with SyncIQ failover sequence..."
       when: onefs_info is defined and onefs_info.Cluster_Info is defined
 
     - name: 3. Execute SyncIQ 'Allow Write' (Failover) on Policy

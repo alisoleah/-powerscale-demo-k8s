@@ -72,7 +72,7 @@
         api_password: "{{ api_password }}"
         policy_name: "{{ policy_name }}"
         state: "absent"
-        ignore_errors: true  # In case policy doesn't exist, continue with lab reset
+      ignore_errors: true  # In case policy doesn't exist, continue with lab reset
 
 
     # ---------------------------------------------------------------

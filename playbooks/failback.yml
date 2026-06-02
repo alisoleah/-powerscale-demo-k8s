@@ -45,6 +45,7 @@
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
         export_id: "{{ nfs_export_id_source }}"
+        path: "/ifs/data/source"
         access_zone: "System"
         read_only: false
         state: "present"
@@ -76,6 +77,7 @@
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
         export_id: "{{ nfs_export_id_target }}"
+        path: "/ifs/data/target"
         access_zone: "System"
         read_only: true
         state: "present"

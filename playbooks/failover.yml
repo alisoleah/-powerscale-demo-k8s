@@ -8,6 +8,14 @@
     # AWX injects these dynamically via the Launch Survey
     isilon_host: "{{ target_cluster | default(inventory_hostname) }}"
     policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
+  # ---------------------------------------------------------------
+  # DYNAMIC DEPENDENCY INSTALLATION
+  # ---------------------------------------------------------------
+  pre_tasks:
+    - name: Ensure PowerScale Python SDK is installed in AWX runner
+      ansible.builtin.pip:
+        name: "isilon-sdk"
+        state: present
 
   tasks:
     - name: 1. Confirm Target Cluster Connectivity

@@ -8,6 +8,14 @@
     isilon_host: "{{ inventory_hostname }}"
     api_user: "{{ ansible_user | default('root') }}"
     api_password: "{{ ansible_password }}"
+  # ---------------------------------------------------------------
+  # DYNAMIC DEPENDENCY INSTALLATION
+  # ---------------------------------------------------------------
+  pre_tasks:
+    - name: Ensure PowerScale Python SDK is installed in AWX runner
+      ansible.builtin.pip:
+        name: "isilon-sdk"
+        state: present
 
   tasks:
     # ---------------------------------------------------------------

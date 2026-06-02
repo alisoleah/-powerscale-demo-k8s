@@ -91,3 +91,18 @@
         controller_host: "{{ awx_host }}"
         controller_username: "{{ awx_username }}"
         controller_password: "{{ awx_password }}"
+
+    - name: 7. Create Shares & Quotas Job Template
+      awx.awx.job_template:
+        name: "SETUP: PowerScale Shares and Quotas"
+        job_type: run
+        inventory: "PowerScale Demo Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/configure_shares.yml"
+        credentials:
+          - "PowerScale_API_Creds"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+---

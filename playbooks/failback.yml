@@ -16,11 +16,9 @@
 
   tasks:
     # ---------------------------------------------------------------
-    # STEP 1: SyncIQ work FIRST — resync_prep + run
-    # Must complete before setting permissions so the sync engine
-    # cannot override the NFS/SMB state we set afterward
+    # STEP 1: Enable policy in case it was auto-disabled
     # ---------------------------------------------------------------
-    - name: 1. Enable SyncIQ policy (may be disabled after error state)
+    - name: 1. Enable SyncIQ policy
       dellemc.powerscale.synciqpolicy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -30,7 +28,13 @@
         enabled: true
         state: "present"
 
-    - name: 2. SyncIQ Resync Prep (resolve conflicted state)
+    # ---------------------------------------------------------------
+    # STEP 2: allow_write_revert — direct complement to allow_write
+    # Releases the SyncIQ domain lock on the source path,
+    # restores target to read-only and source to writable
+    # at the kernel level (NFS export flags cannot override this lock)
+    # ---------------------------------------------------------------
+    - name: 2. SyncIQ Allow Write Revert (restore original direction)
       dellemc.powerscale.synciqpolicy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -38,32 +42,15 @@
         api_password: "{{ ansible_password }}"
         policy_name: "{{ policy_name }}"
         job_params:
-          action: "resync_prep"
-          wait_for_completion: true
-        state: "present"
-      register: resync_result
-      failed_when:
-        - resync_result.failed
-        - "'already done' not in (resync_result.msg | default(''))"
-
-    - name: 3. Re-establish SyncIQ Mirror (run sync)
-      dellemc.powerscale.synciqpolicy:
-        onefs_host: "{{ isilon_host }}"
-        verify_ssl: false
-        api_user: "{{ ansible_user | default('root') }}"
-        api_password: "{{ ansible_password }}"
-        policy_name: "{{ policy_name }}"
-        job_params:
-          action: "run"
+          action: "allow_write_revert"
           wait_for_completion: true
         state: "present"
 
     # ---------------------------------------------------------------
-    # STEP 2: Set permissions AFTER sync completes
-    # SyncIQ engine marks the sync target read-only while running —
-    # setting permissions last ensures the final state is correct
+    # STEP 3: Set NFS + SMB permissions to match restored state
+    # Done AFTER allow_write_revert so domain lock is already released
     # ---------------------------------------------------------------
-    - name: 4a. Un-Fence Site A - Restore SMB Share to Full Write
+    - name: 3a. Un-Fence Site A - Restore SMB Share to Full Write
       dellemc.powerscale.smb:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -80,7 +67,7 @@
               name: "Everyone"
         state: "present"
 
-    - name: 4b. Un-Fence Site A - Restore NFS Export to Read-Write
+    - name: 3b. Un-Fence Site A - Restore NFS Export to Read-Write
       dellemc.powerscale.nfs:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -91,7 +78,7 @@
         read_only: false
         state: "present"
 
-    - name: 5a. Fence Site B - Lock SMB Share to Read-Only
+    - name: 4a. Fence Site B - Lock SMB Share to Read-Only
       dellemc.powerscale.smb:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -108,7 +95,7 @@
               name: "Everyone"
         state: "present"
 
-    - name: 5b. Fence Site B - Lock NFS Export to Read-Only
+    - name: 4b. Fence Site B - Lock NFS Export to Read-Only
       dellemc.powerscale.nfs:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -120,12 +107,12 @@
         state: "present"
 
     # ---------------------------------------------------------------
-    # STEP 3: Final confirmation for demo audience
+    # STEP 4: Final confirmation for demo audience
     # ---------------------------------------------------------------
-    - name: 6. Confirm Failback Complete
+    - name: 5. Confirm Failback Complete
       debug:
         msg:
           - "FAILBACK COMPLETE"
           - "Site A /ifs/data/source → READ-WRITE (Primary restored)"
           - "Site B /ifs/data/target → READ-ONLY  (Standby locked)"
-          - "SyncIQ mirror re-established from Site A → Site B"
+          - "SyncIQ domain lock released — ready for next failover cycle"

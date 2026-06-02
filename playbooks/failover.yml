@@ -3,14 +3,11 @@
   hosts: all
   connection: local
   gather_facts: false
-  
+
   vars:
     isilon_host: "{{ target_cluster | default(inventory_hostname) }}"
     policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
 
-  # ---------------------------------------------------------------
-  # DYNAMIC DEPENDENCY INSTALLATION
-  # ---------------------------------------------------------------
   pre_tasks:
     - name: Ensure PowerScale Python SDK is installed in AWX runner
       ansible.builtin.pip:
@@ -24,24 +21,33 @@
         verify_ssl: false
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
-        gather_subset: 
+        gather_subset:
           - "cluster_identity"
       register: onefs_info
 
     - name: 2. Display Cluster Information
       debug:
-        msg: "Successfully connected to Isilon target at {{ isilon_host }}. Proceeding with SyncIQ failover sequence..."
+        msg: "Successfully connected to Isilon at {{ isilon_host }}. Proceeding with SyncIQ failover sequence..."
 
-    - name: 3. Execute SyncIQ 'Allow Write' (Failover) on Target Policy
-      dellemc.powerscale.synciq_target_policy:
+    # ---------------------------------------------------------------
+    # STEP 3: Promote target — SyncIQ allow_write via job_params
+    # ---------------------------------------------------------------
+    - name: 3. Execute SyncIQ Allow Write (Failover) on Policy
+      dellemc.powerscale.synciqpolicy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
         policy_name: "{{ policy_name }}"
-        state: "allow_write"
+        job_params:
+          action: "allow_write"
+          wait_for_completion: true
+        state: "present"
 
-    - name: 4. Fence off Site A (Prevent Split-Brain by enforcing Read-Only)
+    # ---------------------------------------------------------------
+    # STEP 4: Fence Site A — lock source READ-ONLY (SMB + NFS)
+    # ---------------------------------------------------------------
+    - name: 4a. Fence Site A - Lock SMB Share to Read-Only
       dellemc.powerscale.smb:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -49,7 +55,7 @@
         api_password: "{{ ansible_password }}"
         share_name: "Site_A_Primary"
         path: "/ifs/data/source"
-        description: "LOCKED DUE TO FAILOVER"
+        description: "LOCKED - Site A is Read-Only during Failover"
         permissions:
           - permission: "read"
             permission_type: "allow"
@@ -58,6 +64,55 @@
               name: "Everyone"
         state: "present"
 
-    - name: 5. Confirm Failover Success
+    - name: 4b. Fence Site A - Lock NFS Export to Read-Only
+      dellemc.powerscale.nfs:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        path: "/ifs/data/source"
+        access_zone: "System"
+        read_only: true
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # STEP 5: Open Site B — make target READ-WRITE (SMB + NFS)
+    # ---------------------------------------------------------------
+    - name: 5a. Open Site B - Unlock SMB Share to Full Write
+      dellemc.powerscale.smb:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        share_name: "Site_B_Recovery"
+        path: "/ifs/data/target"
+        description: "ACTIVE - Site B is the live target"
+        permissions:
+          - permission: "full"
+            permission_type: "allow"
+            trustee:
+              type: "wellknown"
+              name: "Everyone"
+        state: "present"
+
+    - name: 5b. Open Site B - Unlock NFS Export to Read-Write
+      dellemc.powerscale.nfs:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        path: "/ifs/data/target"
+        access_zone: "System"
+        read_only: false
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # STEP 6: Final confirmation for demo audience
+    # ---------------------------------------------------------------
+    - name: 6. Confirm Failover Complete
       debug:
-        msg: "FAILOVER COMPLETE: Policy '{{ policy_name }}' on {{ isilon_host }} is now in ALLOW_WRITE state. Target is live."
+        msg:
+          - "FAILOVER COMPLETE"
+          - "Policy '{{ policy_name }}' → ALLOW_WRITE"
+          - "Site A /ifs/data/source → READ-ONLY  (SMB + NFS locked)"
+          - "Site B /ifs/data/target → READ-WRITE (SMB + NFS open)"

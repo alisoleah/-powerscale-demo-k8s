@@ -3,7 +3,7 @@
   hosts: all
   connection: local
   gather_facts: false
-  
+
   vars:
     isilon_host: "{{ target_cluster | default(inventory_hostname) }}"
     policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
@@ -15,7 +15,10 @@
         state: present
 
   tasks:
-    - name: 1. Un-Fence Site A (Restore Full Write Access)
+    # ---------------------------------------------------------------
+    # STEP 1: Un-fence Site A — restore source to READ-WRITE (SMB + NFS)
+    # ---------------------------------------------------------------
+    - name: 1a. Un-Fence Site A - Restore SMB Share to Full Write
       dellemc.powerscale.smb:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -32,7 +35,21 @@
               name: "Everyone"
         state: "present"
 
-    - name: 2. Fence Site B (Lock Recovery Share to Read-Only)
+    - name: 1b. Un-Fence Site A - Restore NFS Export to Read-Write
+      dellemc.powerscale.nfs:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        path: "/ifs/data/source"
+        access_zone: "System"
+        read_only: false
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # STEP 2: Fence Site B — lock target back to READ-ONLY (SMB + NFS)
+    # ---------------------------------------------------------------
+    - name: 2a. Fence Site B - Lock SMB Share to Read-Only
       dellemc.powerscale.smb:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -49,7 +66,21 @@
               name: "Everyone"
         state: "present"
 
-    - name: 3. Re-establish SyncIQ Mirror (Resync Prep / Baseline)
+    - name: 2b. Fence Site B - Lock NFS Export to Read-Only
+      dellemc.powerscale.nfs:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        path: "/ifs/data/target"
+        access_zone: "System"
+        read_only: true
+        state: "present"
+
+    # ---------------------------------------------------------------
+    # STEP 3: Re-establish SyncIQ mirror — sync from Site A back to Site B
+    # ---------------------------------------------------------------
+    - name: 3. Re-establish SyncIQ Mirror (run baseline sync)
       dellemc.powerscale.synciqpolicy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
@@ -60,3 +91,14 @@
           action: "run"
           wait_for_completion: true
         state: "present"
+
+    # ---------------------------------------------------------------
+    # STEP 4: Final confirmation for demo audience
+    # ---------------------------------------------------------------
+    - name: 4. Confirm Failback Complete
+      debug:
+        msg:
+          - "FAILBACK COMPLETE"
+          - "Site A /ifs/data/source → READ-WRITE (Primary restored)"
+          - "Site B /ifs/data/target → READ-ONLY  (Standby locked)"
+          - "SyncIQ mirror re-established from Site A → Site B"

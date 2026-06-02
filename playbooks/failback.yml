@@ -1,0 +1,45 @@
+---
+- name: EXECUTE FAILBACK & RESTORE - PowerScale SyncIQ
+  hosts: all
+  connection: local
+  gather_facts: false
+  
+  vars:
+    isilon_host: "{{ target_cluster | default(inventory_hostname) }}"
+    policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
+
+  pre_tasks:
+    - name: Ensure PowerScale Python SDK is installed in AWX runner
+      ansible.builtin.pip:
+        name: "isilon-sdk"
+        state: present
+
+  tasks:
+    - name: 1. Un-Fence Site A (Restore Full Write Access)
+      dellemc.powerscale.smb:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        share_name: "Site_A_Primary"
+        path: "/ifs/data/source"
+        description: "Primary Windows Share (Active)"
+        permissions:
+          - permission: "full"
+            permission_type: "allow"
+            trustee:
+              type: "wellknown"
+              name: "Everyone"
+        state: "present"
+
+    - name: 2. Re-establish SyncIQ Mirror (Resync Prep / Baseline)
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        job_params:
+          action: "run"
+          wait_for_completion: true
+        state: "present"

@@ -3,11 +3,11 @@
   hosts: all
   connection: local
   gather_facts: false
-
+  
   vars:
-    # AWX injects these dynamically via the Launch Survey
     isilon_host: "{{ target_cluster | default(inventory_hostname) }}"
     policy_name: "{{ synciq_policy | default('NFS_Demo_Policy') }}"
+
   # ---------------------------------------------------------------
   # DYNAMIC DEPENDENCY INSTALLATION
   # ---------------------------------------------------------------
@@ -31,21 +31,33 @@
     - name: 2. Display Cluster Information
       debug:
         msg: "Successfully connected to Isilon target at {{ isilon_host }}. Proceeding with SyncIQ failover sequence..."
-      when: onefs_info is defined and onefs_info.Cluster_Info is defined
 
-    - name: 3. Execute SyncIQ 'Allow Write' (Failover) on Policy
-      dellemc.powerscale.synciqpolicy:
+    - name: 3. Execute SyncIQ 'Allow Write' (Failover) on Target Policy
+      dellemc.powerscale.synciq_target_policy:
         onefs_host: "{{ isilon_host }}"
         verify_ssl: false
         api_user: "{{ ansible_user | default('root') }}"
         api_password: "{{ ansible_password }}"
         policy_name: "{{ policy_name }}"
-        job_params:
-          action: "allow_write"
-          wait_for_completion: true
-        state: "present"
-      register: failover_result
+        state: "allow_write"
 
-    - name: 4. Confirm Failover Success
+    - name: 4. Fence off Site A (Prevent Split-Brain by enforcing Read-Only)
+      dellemc.powerscale.smb:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        share_name: "Site_A_Primary"
+        path: "/ifs/data/source"
+        description: "LOCKED DUE TO FAILOVER"
+        permissions:
+          - permission: "read"
+            permission_type: "allow"
+            trustee:
+              type: "wellknown"
+              name: "Everyone"
+        state: "present"
+
+    - name: 5. Confirm Failover Success
       debug:
         msg: "FAILOVER COMPLETE: Policy '{{ policy_name }}' on {{ isilon_host }} is now in ALLOW_WRITE state. Target is live."

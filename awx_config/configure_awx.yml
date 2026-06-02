@@ -105,3 +105,19 @@
         controller_host: "{{ awx_host }}"
         controller_username: "{{ awx_username }}"
         controller_password: "{{ awx_password }}"
+
+    - name: 8. Create Failback Job Template
+      awx.awx.job_template:
+        name: "EXECUTE: Site B to Site A Failback (Restore)"
+        job_type: run
+        inventory: "PowerScale Demo Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/failback.yml"
+        credentials:
+          - "PowerScale_API_Creds"
+        ask_variables_on_launch: true
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+

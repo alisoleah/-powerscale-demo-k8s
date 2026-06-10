@@ -83,7 +83,7 @@ fi
 
 echo ""
 echo "Step 1: Building NFS client image..."
-docker compose -f "$NFS_CLIENTS_DIR/docker-compose.yml" build
+docker build -t powerscale-nfs-client:latest "$NFS_CLIENTS_DIR/"
 
 echo ""
 echo "Step 2: Starting NFS client containers..."

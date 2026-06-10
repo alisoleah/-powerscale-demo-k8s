@@ -299,3 +299,21 @@ Step 2 only fires when Step 1 succeeds. Check the Step 1 job output in AWX for t
 **fstab still has old entry**
 The switchover playbooks use `state: absent` which removes the old entry automatically.
 To clear manually: `docker exec nfs-client-1 sed -i '/powerscale/d' /etc/fstab`
+
+=================================================
+ DEPLOYMENT COMPLETE
+=================================================
+
+  Container         IP               SSH
+  ─────────────── ──────────────── ──────────────────────────────
+  nfs-client-1     192.168.49.10      ssh root@192.168.49.10  (pass: demo1234)
+  nfs-client-2     192.168.49.11      ssh root@192.168.49.11  (pass: demo1234)
+
+  NFS Server (PowerScale): 192.168.243.50
+  Mount Point on Clients : /mnt/powerscale_data
+
+  AWX URL    : http://192.168.49.2:31056
+
+  To stop containers:  docker compose -f nfs-clients/docker-compose.yml down
+  To view logs:        docker logs nfs-client-1
+=================================================

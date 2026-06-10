@@ -6,9 +6,7 @@
 
 services:
   nfs-client-1:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: powerscale-nfs-client:latest
     container_name: nfs-client-1
     hostname: linux-client-1
     privileged: true
@@ -18,9 +16,7 @@ services:
     restart: unless-stopped
 
   nfs-client-2:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: powerscale-nfs-client:latest
     container_name: nfs-client-2
     hostname: linux-client-2
     privileged: true

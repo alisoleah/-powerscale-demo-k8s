@@ -9,7 +9,7 @@
     site_a_export: "{{ nfs_export_site_a | default('/ifs/data/source') }}"
     site_b_export: "{{ nfs_export_site_b | default('/ifs/data/target') }}"
     mount_point: "{{ client_mount_point | default('/mnt/powerscale_data') }}"
-    nfs_options: "{{ client_nfs_options | default('rw,sync,hard,intr,nfsvers=3,timeo=14,retrans=3') }}"
+    nfs_options: "{{ client_nfs_options | default('rw,soft,timeo=10,retrans=2,nfsvers=3') }}"
 
   tasks:
     # ---------------------------------------------------------------
@@ -30,13 +30,16 @@
           - "Action     : Switching back to Site A ({{ nfs_server }}:{{ site_a_export }})"
 
     # ---------------------------------------------------------------
-    # STEP 3: Remove Site B mount and fstab entry
+    # STEP 3: Unmount Site B cleanly even if the server is unreachable
     # ---------------------------------------------------------------
-    - name: 3. Unmount Site B Export and Remove from /etc/fstab
+    - name: 3a. Force-Unmount Site B (safe when server is unreachable)
+      ansible.builtin.command: umount -f -l "{{ mount_point }}"
+      failed_when: false
+      changed_when: false
+
+    - name: 3b. Remove Site B from /etc/fstab
       ansible.posix.mount:
         path: "{{ mount_point }}"
-        src: "{{ nfs_server }}:{{ site_b_export }}"
-        fstype: nfs
         state: absent
 
     # ---------------------------------------------------------------

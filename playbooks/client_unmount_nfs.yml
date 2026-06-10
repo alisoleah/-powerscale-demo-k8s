@@ -22,9 +22,15 @@
         msg: "Current mount at {{ mount_point }}: {{ current_mount.stdout | default('nothing mounted') }}"
 
     # ---------------------------------------------------------------
-    # STEP 3: Gracefully unmount and remove from fstab
+    # STEP 3: Force-unmount (safe even if server is unreachable), then
+    # clean the fstab entry as a separate step.
     # ---------------------------------------------------------------
-    - name: 3. Unmount NFS Export and Remove from /etc/fstab
+    - name: 3a. Force-Unmount NFS Export
+      ansible.builtin.command: umount -f -l "{{ mount_point }}"
+      failed_when: false
+      changed_when: false
+
+    - name: 3b. Remove Mount Entry from /etc/fstab
       ansible.posix.mount:
         path: "{{ mount_point }}"
         state: absent

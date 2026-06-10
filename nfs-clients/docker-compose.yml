@@ -1,0 +1,34 @@
+---
+# NFS Demo Client Containers
+# These Ubuntu containers simulate Linux NFS client machines.
+# They run on the minikube bridge network so AWX task pods can SSH into them.
+# Privileged mode is required for in-container NFS mounts.
+
+services:
+  nfs-client-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nfs-client-1
+    hostname: linux-client-1
+    privileged: true
+    networks:
+      minikube:
+        ipv4_address: 192.168.49.10
+    restart: unless-stopped
+
+  nfs-client-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nfs-client-2
+    hostname: linux-client-2
+    privileged: true
+    networks:
+      minikube:
+        ipv4_address: 192.168.49.11
+    restart: unless-stopped
+
+networks:
+  minikube:
+    external: true

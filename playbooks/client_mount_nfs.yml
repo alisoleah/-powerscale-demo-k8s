@@ -1,0 +1,58 @@
+---
+- name: MOUNT NFS SHARES ON CLIENTS - PowerScale Site A (Initial Setup)
+  hosts: nfs_clients
+  gather_facts: false
+  become: true
+
+  vars:
+    nfs_server: "{{ powerscale_ip | default('192.168.243.50') }}"
+    nfs_export: "{{ nfs_export_path | default('/ifs/data/source') }}"
+    mount_point: "{{ client_mount_point | default('/mnt/powerscale_data') }}"
+    nfs_options: "{{ client_nfs_options | default('rw,sync,hard,intr,nfsvers=3,timeo=14,retrans=3') }}"
+
+  tasks:
+    - name: 1. Verify NFS Utilities Are Installed
+      ansible.builtin.package:
+        name:
+          - nfs-common
+          - nfs-utils
+        state: present
+      ignore_errors: true
+
+    # ---------------------------------------------------------------
+    # STEP 2: Create mount point directory on the client
+    # ---------------------------------------------------------------
+    - name: 2. Create Mount Point Directory
+      ansible.builtin.file:
+        path: "{{ mount_point }}"
+        state: directory
+        mode: "0755"
+
+    # ---------------------------------------------------------------
+    # STEP 3: Mount NFS export and persist to fstab
+    # ---------------------------------------------------------------
+    - name: 3. Mount NFS Export and Add to /etc/fstab
+      ansible.posix.mount:
+        path: "{{ mount_point }}"
+        src: "{{ nfs_server }}:{{ nfs_export }}"
+        fstype: nfs
+        opts: "{{ nfs_options }}"
+        state: mounted
+
+    # ---------------------------------------------------------------
+    # STEP 4: Verify mount is active and accessible
+    # ---------------------------------------------------------------
+    - name: 4. Verify Mount Is Active
+      ansible.builtin.command: df -h "{{ mount_point }}"
+      register: df_output
+      changed_when: false
+
+    - name: 5. Display Mount Status
+      ansible.builtin.debug:
+        msg:
+          - "NFS MOUNT COMPLETE on {{ inventory_hostname }}"
+          - "Server Export : {{ nfs_server }}:{{ nfs_export }}"
+          - "Local Mount   : {{ mount_point }}"
+          - "NFS Options   : {{ nfs_options }}"
+          - "fstab Updated : YES (persistent across reboots)"
+          - "Disk Usage    : {{ df_output.stdout_lines[1] | default('mounted') }}"

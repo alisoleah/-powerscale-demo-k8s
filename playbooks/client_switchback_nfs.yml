@@ -1,0 +1,69 @@
+---
+- name: CLIENT NFS SWITCHBACK - Remount from Site B to Site A (Post-Failback)
+  hosts: nfs_clients
+  gather_facts: false
+  become: true
+
+  vars:
+    nfs_server: "{{ powerscale_ip | default('192.168.243.50') }}"
+    site_a_export: "{{ nfs_export_site_a | default('/ifs/data/source') }}"
+    site_b_export: "{{ nfs_export_site_b | default('/ifs/data/target') }}"
+    mount_point: "{{ client_mount_point | default('/mnt/powerscale_data') }}"
+    nfs_options: "{{ client_nfs_options | default('rw,sync,hard,intr,nfsvers=3,timeo=14,retrans=3') }}"
+
+  tasks:
+    # ---------------------------------------------------------------
+    # STEP 1: Capture current state for demo audience
+    # ---------------------------------------------------------------
+    - name: 1. Record Current Mount (Pre-Switchback)
+      ansible.builtin.command: findmnt -n -o SOURCE,OPTIONS "{{ mount_point }}"
+      register: pre_switch_mount
+      changed_when: false
+      failed_when: false
+
+    - name: 2. Display Pre-Switchback State
+      ansible.builtin.debug:
+        msg:
+          - "PRE-SWITCHBACK STATE on {{ inventory_hostname }}"
+          - "Mount Point: {{ mount_point }}"
+          - "Currently  : {{ pre_switch_mount.stdout | default('nothing mounted') }}"
+          - "Action     : Switching back to Site A ({{ nfs_server }}:{{ site_a_export }})"
+
+    # ---------------------------------------------------------------
+    # STEP 3: Remove Site B mount and fstab entry
+    # ---------------------------------------------------------------
+    - name: 3. Unmount Site B Export and Remove from /etc/fstab
+      ansible.posix.mount:
+        path: "{{ mount_point }}"
+        src: "{{ nfs_server }}:{{ site_b_export }}"
+        fstype: nfs
+        state: absent
+
+    # ---------------------------------------------------------------
+    # STEP 4: Mount Site A at same mount point, persist to fstab
+    # ---------------------------------------------------------------
+    - name: 4. Mount Site A Export and Add to /etc/fstab
+      ansible.posix.mount:
+        path: "{{ mount_point }}"
+        src: "{{ nfs_server }}:{{ site_a_export }}"
+        fstype: nfs
+        opts: "{{ nfs_options }}"
+        state: mounted
+
+    # ---------------------------------------------------------------
+    # STEP 5: Verify restored mount is active
+    # ---------------------------------------------------------------
+    - name: 5. Verify Restored Mount Is Active
+      ansible.builtin.command: findmnt -n -o SOURCE,OPTIONS "{{ mount_point }}"
+      register: post_switch_mount
+      changed_when: false
+
+    - name: 6. Confirm Switchback Complete
+      ansible.builtin.debug:
+        msg:
+          - "CLIENT SWITCHBACK COMPLETE on {{ inventory_hostname }}"
+          - "Mount Point  : {{ mount_point }}"
+          - "Was (Site B) : {{ nfs_server }}:{{ site_b_export }}"
+          - "Now (Site A) : {{ post_switch_mount.stdout }}"
+          - "fstab Updated: YES — pointing back to Site A (primary)"
+          - "Clients are restored to PRIMARY site — normal operations resume"

@@ -7,14 +7,52 @@
     - awx.awx
 
   vars:
-    # --- UPDATE THESE 4 VARIABLES BEFORE RUNNING ---
-    awx_host: "http://127.0.0.1:32825" 
-    awx_password: "Kvkp8Xp1x7Z4usCQSLVCJ79lf1FIbk2J"
+    # Only isilon_password and github_repo need manual updating.
+    # awx_host and awx_password are auto-detected from Minikube in pre_tasks below.
     isilon_password: "dell1234"
     controller_validate_certs: false
     github_repo: "https://github.com/alisoleah/-powerscale-demo-k8s.git"
-    
+
+    # --- NFS CLIENT SETTINGS (Docker containers deployed by deploy_nfs_clients.sh) ---
+    nfs_client_user: "root"
+    nfs_client_password: "demo1234"
+    nfs_client_hosts:
+      - name: "linux-client-1"
+        ip: "192.168.49.10"
+      - name: "linux-client-2"
+        ip: "192.168.49.11"
+
     awx_username: "admin"
+    awx_host: ""
+    awx_password: ""
+
+  pre_tasks:
+    - name: 0a. Detect AWX URL from Minikube NodePort (no tunnel required)
+      ansible.builtin.shell: |
+        MINIKUBE_IP=$(minikube ip)
+        NODEPORT=$(kubectl get service awx-demo-service -n awx \
+          -o jsonpath='{.spec.ports[0].nodePort}')
+        echo "http://${MINIKUBE_IP}:${NODEPORT}"
+      register: _awx_url
+      changed_when: false
+
+    - name: 0b. Detect AWX admin password from Kubernetes secret
+      ansible.builtin.shell: |
+        kubectl get secret awx-demo-admin-password -n awx \
+          -o jsonpath='{.data.password}' | base64 --decode
+      register: _awx_pass
+      changed_when: false
+      no_log: true
+
+    - name: 0c. Set AWX connection facts
+      ansible.builtin.set_fact:
+        awx_host: "{{ _awx_url.stdout | trim }}"
+        awx_password: "{{ _awx_pass.stdout | trim }}"
+      no_log: true
+
+    - name: 0d. Confirm AWX target
+      ansible.builtin.debug:
+        msg: "Connecting to AWX at {{ awx_host }}"
 
   tasks:
     - name: 1. Create PowerScale Machine Credential
@@ -130,6 +168,176 @@
         playbook: "playbooks/reset_lab.yml"
         credentials:
           - "PowerScale_API_Creds"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    # ---------------------------------------------------------------
+    # NFS CLIENT AUTOMATION - Inventory, Credentials, Job Templates
+    # ---------------------------------------------------------------
+    - name: 10. Create NFS Client SSH Credential
+      awx.awx.credential:
+        name: "NFS_Client_SSH_Creds"
+        credential_type: "Machine"
+        organization: "Default"
+        inputs:
+          username: "{{ nfs_client_user }}"
+          password: "{{ nfs_client_password }}"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 11. Create NFS Clients Inventory
+      awx.awx.inventory:
+        name: "NFS Clients Inventory"
+        organization: "Default"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 12. Add NFS Client Hosts to Inventory
+      awx.awx.host:
+        name: "{{ item.name }}"
+        inventory: "NFS Clients Inventory"
+        variables:
+          ansible_host: "{{ item.ip }}"
+          nfs_server: "192.168.243.50"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+      loop: "{{ nfs_client_hosts }}"
+
+    - name: 13. Create NFS Initial Mount Job Template
+      awx.awx.job_template:
+        name: "CLIENT: Mount NFS Shares (Initial Setup)"
+        job_type: run
+        inventory: "NFS Clients Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/client_mount_nfs.yml"
+        credentials:
+          - "NFS_Client_SSH_Creds"
+        ask_variables_on_launch: true
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 14. Create NFS Unmount Job Template
+      awx.awx.job_template:
+        name: "CLIENT: Unmount NFS Shares (Cleanup)"
+        job_type: run
+        inventory: "NFS Clients Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/client_unmount_nfs.yml"
+        credentials:
+          - "NFS_Client_SSH_Creds"
+        ask_variables_on_launch: true
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 15. Create NFS Client Switchover Job Template
+      awx.awx.job_template:
+        name: "CLIENT: Switch NFS Mount to Site B (Post-Failover)"
+        job_type: run
+        inventory: "NFS Clients Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/client_switchover_nfs.yml"
+        credentials:
+          - "NFS_Client_SSH_Creds"
+        ask_variables_on_launch: true
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 16. Create NFS Client Switchback Job Template
+      awx.awx.job_template:
+        name: "CLIENT: Switch NFS Mount to Site A (Post-Failback)"
+        job_type: run
+        inventory: "NFS Clients Inventory"
+        project: "PowerScale Failover Playbooks"
+        playbook: "playbooks/client_switchback_nfs.yml"
+        credentials:
+          - "NFS_Client_SSH_Creds"
+        ask_variables_on_launch: true
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    # ---------------------------------------------------------------
+    # WORKFLOWS - Chain PowerScale + Client steps into single-click runs
+    # ---------------------------------------------------------------
+
+    - name: 17. Create Full Failover Workflow Template
+      awx.awx.workflow_job_template:
+        name: "WORKFLOW: Full Failover (PowerScale + Clients)"
+        organization: "Default"
+        description: "Fence Site A, promote Site B, then remount all NFS clients to Site B"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 18. Add Client Switchover Node to Failover Workflow (create leaf first)
+      awx.awx.workflow_job_template_node:
+        identifier: "step2-client-switchover"
+        workflow_job_template: "WORKFLOW: Full Failover (PowerScale + Clients)"
+        unified_job_template: "CLIENT: Switch NFS Mount to Site B (Post-Failover)"
+        organization: "Default"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 19. Add PowerScale Failover Node (triggers client step on success)
+      awx.awx.workflow_job_template_node:
+        identifier: "step1-powerscale-failover"
+        workflow_job_template: "WORKFLOW: Full Failover (PowerScale + Clients)"
+        unified_job_template: "EXECUTE: Site A to Site B NFS Failover"
+        organization: "Default"
+        success_nodes:
+          - "step2-client-switchover"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 20. Create Full Failback Workflow Template
+      awx.awx.workflow_job_template:
+        name: "WORKFLOW: Full Failback (PowerScale + Clients)"
+        organization: "Default"
+        description: "Restore Site A, fence Site B, then remount all NFS clients back to Site A"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 21. Add Client Switchback Node to Failback Workflow (create leaf first)
+      awx.awx.workflow_job_template_node:
+        identifier: "step2-client-switchback"
+        workflow_job_template: "WORKFLOW: Full Failback (PowerScale + Clients)"
+        unified_job_template: "CLIENT: Switch NFS Mount to Site A (Post-Failback)"
+        organization: "Default"
+        state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 22. Add PowerScale Failback Node (triggers client step on success)
+      awx.awx.workflow_job_template_node:
+        identifier: "step1-powerscale-failback"
+        workflow_job_template: "WORKFLOW: Full Failback (PowerScale + Clients)"
+        unified_job_template: "EXECUTE: Site B to Site A Failback (Restore)"
+        organization: "Default"
+        success_nodes:
+          - "step2-client-switchback"
         state: present
         controller_host: "{{ awx_host }}"
         controller_username: "{{ awx_username }}"

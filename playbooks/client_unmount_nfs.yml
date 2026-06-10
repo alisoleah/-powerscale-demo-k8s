@@ -1,0 +1,48 @@
+---
+- name: UNMOUNT NFS SHARES ON CLIENTS - Graceful Cleanup
+  hosts: nfs_clients
+  gather_facts: false
+  become: true
+
+  vars:
+    mount_point: "{{ client_mount_point | default('/mnt/powerscale_data') }}"
+
+  tasks:
+    # ---------------------------------------------------------------
+    # STEP 1: Check what is currently mounted at the mount point
+    # ---------------------------------------------------------------
+    - name: 1. Check Current Mount Status
+      ansible.builtin.command: findmnt -n -o SOURCE "{{ mount_point }}"
+      register: current_mount
+      changed_when: false
+      failed_when: false
+
+    - name: 2. Display Current Mount
+      ansible.builtin.debug:
+        msg: "Current mount at {{ mount_point }}: {{ current_mount.stdout | default('nothing mounted') }}"
+
+    # ---------------------------------------------------------------
+    # STEP 3: Gracefully unmount and remove from fstab
+    # ---------------------------------------------------------------
+    - name: 3. Unmount NFS Export and Remove from /etc/fstab
+      ansible.posix.mount:
+        path: "{{ mount_point }}"
+        state: absent
+
+    # ---------------------------------------------------------------
+    # STEP 4: Confirm cleanup
+    # ---------------------------------------------------------------
+    - name: 4. Verify Mount Point Is Clean
+      ansible.builtin.command: findmnt -n -o SOURCE "{{ mount_point }}"
+      register: post_unmount
+      changed_when: false
+      failed_when: false
+
+    - name: 5. Display Unmount Status
+      ansible.builtin.debug:
+        msg:
+          - "NFS UNMOUNT COMPLETE on {{ inventory_hostname }}"
+          - "Mount Point   : {{ mount_point }}"
+          - "Previously    : {{ current_mount.stdout | default('not mounted') }}"
+          - "Now           : {{ post_unmount.stdout | default('CLEAN - nothing mounted') }}"
+          - "fstab Updated : YES (entry removed)"

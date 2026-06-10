@@ -96,7 +96,18 @@
         scm_url: "{{ github_repo }}"
         scm_update_on_launch: true
         update_project: true
+        wait: true
         state: present
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+
+    - name: 4b. Force Project Sync and Wait for Completion
+      awx.awx.project_update:
+        project: "PowerScale Failover Playbooks"
+        organization: "Default"
+        wait: true
+        timeout: 120
         controller_host: "{{ awx_host }}"
         controller_username: "{{ awx_username }}"
         controller_password: "{{ awx_password }}"

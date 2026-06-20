@@ -1,6 +1,6 @@
 ---
 - name: CLIENT NFS SWITCHOVER - Remount from Site A to Site B (Post-Failover)
-  hosts: nfs_clients
+  hosts: all
   gather_facts: false
   become: true
 

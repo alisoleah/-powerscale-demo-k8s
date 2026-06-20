@@ -1,6 +1,6 @@
 ---
 - name: UNMOUNT NFS SHARES ON CLIENTS - Graceful Cleanup
-  hosts: nfs_clients
+  hosts: all
   gather_facts: false
   become: true
 

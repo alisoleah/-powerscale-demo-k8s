@@ -1,6 +1,6 @@
 ---
 - name: CLIENT NFS SWITCHBACK - Remount from Site B to Site A (Post-Failback)
-  hosts: nfs_clients
+  hosts: all
   gather_facts: false
   become: true
 

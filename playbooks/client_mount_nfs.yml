@@ -1,6 +1,6 @@
 ---
 - name: MOUNT NFS SHARES ON CLIENTS - PowerScale Site A (Initial Setup)
-  hosts: nfs_clients
+  hosts: all
   gather_facts: false
   become: true
 

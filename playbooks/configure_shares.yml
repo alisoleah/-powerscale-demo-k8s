@@ -58,7 +58,7 @@
         path: "/ifs/data/source"
         description: "Primary Data Center NFS"
         root_clients:
-          - "ALL"
+          - "192.168.49.0/24"
         state: "present"
 
     - name: 4. Create Target NFS Export (Site B)
@@ -70,7 +70,7 @@
         path: "/ifs/data/target"
         description: "Standby Data Center NFS (Read-Only until Failover)"
         root_clients:
-          - "ALL"
+          - "192.168.49.0/24"
         state: "present"
 
     # ---------------------------------------------------------------

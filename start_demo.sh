@@ -2,6 +2,12 @@
 # Startup Script: AWX Demo Environment
 
 echo "================================================="
+echo "0. Loading NFS Kernel Modules..."
+echo "================================================="
+sudo modprobe nfs 2>/dev/null && echo "  nfs module: loaded" || echo "  nfs module: already built-in or unavailable"
+sudo modprobe nfsv3 2>/dev/null && echo "  nfsv3 module: loaded" || echo "  nfsv3 module: already built-in or unavailable"
+
+echo "================================================="
 echo "1. Waking up the Kubernetes Cluster..."
 echo "================================================="
 # This is safe to run even if the cluster is already running

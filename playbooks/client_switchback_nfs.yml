@@ -9,7 +9,7 @@
     site_a_export: "{{ nfs_export_site_a | default('/ifs/data/source') }}"
     site_b_export: "{{ nfs_export_site_b | default('/ifs/data/target') }}"
     mount_point: "{{ client_mount_point | default('/mnt/powerscale_data') }}"
-    nfs_options: "{{ client_nfs_options | default('rw,soft,timeo=10,retrans=2,nfsvers=4') }}"
+    nfs_options: "{{ client_nfs_options | default('rw,soft,timeo=10,retrans=2,nfsvers=4,sec=sys') }}"
 
   tasks:
     # ---------------------------------------------------------------

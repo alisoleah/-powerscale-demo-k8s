@@ -57,13 +57,13 @@ print(match or '')
     return 1
   fi
 
-  # Launch the job
+  # Launch the job with explicit NFS options (ensures sec=sys even if AWX has old playbook)
   local job_id
   job_id=$(curl -s -X POST \
     -u "${AWX_USER}:${awx_pass}" \
     -H "Content-Type: application/json" \
     "${awx_url}/api/v2/job_templates/${template_id}/launch/" \
-    -d '{}' \
+    -d '{"extra_vars": "{\"client_nfs_options\": \"rw,soft,timeo=10,retrans=2,nfsvers=4,sec=sys\"}"}' \
     | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
 
   echo "$job_id"

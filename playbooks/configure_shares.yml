@@ -19,6 +19,30 @@
 
   tasks:
     # ---------------------------------------------------------------
+    # DIRECTORY PERMISSIONS (must be set before clients can write via NFS)
+    # 0777 avoids NFSv4 identity-mapping issues in container environments
+    # ---------------------------------------------------------------
+    - name: 0a. Set Source Directory Permissions (world-writable for NFS clients)
+      dellemc.powerscale.filesystem:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        path: "/ifs/data/source"
+        access_control: "0777"
+        state: "present"
+
+    - name: 0b. Set Target Directory Permissions (world-writable for NFS clients)
+      dellemc.powerscale.filesystem:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ api_user }}"
+        api_password: "{{ api_password }}"
+        path: "/ifs/data/target"
+        access_control: "0777"
+        state: "present"
+
+    # ---------------------------------------------------------------
     # SMARTQUOTAS (5GB Limits)
     # ---------------------------------------------------------------
     - name: 1. Apply 5GB SmartQuota to Source (Site A)

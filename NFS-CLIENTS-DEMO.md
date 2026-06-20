@@ -317,3 +317,5 @@ To clear manually: `docker exec nfs-client-1 sed -i '/powerscale/d' /etc/fstab`
   To stop containers:  docker compose -f nfs-clients/docker-compose.yml down
   To view logs:        docker logs nfs-client-1
 =================================================
+
+

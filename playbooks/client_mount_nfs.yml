@@ -8,16 +8,13 @@
     nfs_server: "{{ powerscale_ip | default('192.168.243.50') }}"
     nfs_export: "{{ nfs_export_path | default('/ifs/data/source') }}"
     mount_point: "{{ client_mount_point | default('/mnt/powerscale_data') }}"
-    nfs_options: "{{ client_nfs_options | default('rw,soft,timeo=10,retrans=2,nfsvers=3') }}"
+    nfs_options: "{{ client_nfs_options | default('rw,soft,timeo=10,retrans=2,nfsvers=3,nolock') }}"
 
   tasks:
     - name: 1. Verify NFS Utilities Are Installed
       ansible.builtin.package:
-        name:
-          - nfs-common
-          - nfs-utils
+        name: nfs-common
         state: present
-      ignore_errors: true
 
     # ---------------------------------------------------------------
     # STEP 2: Create mount point directory on the client

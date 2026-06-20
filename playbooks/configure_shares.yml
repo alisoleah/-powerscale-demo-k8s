@@ -83,6 +83,7 @@
         description: "Primary Data Center NFS"
         root_clients:
           - "172.27.96.0/20"
+        read_only: false
         state: "present"
 
     - name: 4. Create Target NFS Export (Site B)
@@ -95,6 +96,7 @@
         description: "Standby Data Center NFS (Read-Only until Failover)"
         root_clients:
           - "172.27.96.0/20"
+        read_only: true
         state: "present"
 
     # ---------------------------------------------------------------

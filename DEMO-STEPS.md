@@ -23,7 +23,7 @@
 Open a terminal and run:
 
 ```bash
-cd ~/powerscale-demo-k8s
+cd ~/powerscale-demo-k8s;
 ./start_demo.sh
 ```
 
@@ -73,6 +73,9 @@ docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data
 docker exec nfs-client-2 findmnt -n -o SOURCE /mnt/powerscale_data
 # Expected: 192.168.243.50:/ifs/data/source
 
+# List files — both files should appear from both clients (shared NFS)
+docker exec nfs-client-1 ls -la /mnt/powerscale_data/
+```
 # Confirm read-write access
 docker exec nfs-client-1 touch /mnt/powerscale_data/client1-precheck.txt
 docker exec nfs-client-2 touch /mnt/powerscale_data/client2-precheck.txt
@@ -101,13 +104,13 @@ Wait for both jobs to show **green (Successful)** in AWX Jobs view.
 
 ```bash
 # Confirm clients switched to Site B (/ifs/data/target)
-docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data
+docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data;
 docker exec nfs-client-2 findmnt -n -o SOURCE /mnt/powerscale_data
 # Expected: 192.168.243.50:/ifs/data/target
 
 # Confirm Site B is writable
-docker exec nfs-client-1 touch /mnt/powerscale_data/post-failover-client1.txt
-docker exec nfs-client-2 touch /mnt/powerscale_data/post-failover-client2.txt
+docker exec nfs-client-1 touch /mnt/powerscale_data/post-failover-client1.txt;
+docker exec nfs-client-2 touch /mnt/powerscale_data/post-failover-client2.txt;
 docker exec nfs-client-1 ls -la /mnt/powerscale_data/
 
 # Confirm Site A is now READ-ONLY (fenced)

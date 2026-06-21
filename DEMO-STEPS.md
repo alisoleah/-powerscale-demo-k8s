@@ -108,14 +108,20 @@ docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data;
 docker exec nfs-client-2 findmnt -n -o SOURCE /mnt/powerscale_data
 # Expected: 192.168.243.50:/ifs/data/target
 
+
+
+###########################  make sure ssh root@192.168.243.50 "chmod 777 /ifs/data/target";   dell1234
 # Confirm Site B is writable
 docker exec nfs-client-1 touch /mnt/powerscale_data/post-failover-client1.txt;
 docker exec nfs-client-2 touch /mnt/powerscale_data/post-failover-client2.txt;
 docker exec nfs-client-1 ls -la /mnt/powerscale_data/
 
+
+
+
 # Confirm Site A is now READ-ONLY (fenced)
-docker exec nfs-client-1 mkdir -p /tmp/test-site-a
-docker exec nfs-client-1 mount -t nfs 192.168.243.50:/ifs/data/source /tmp/test-site-a
+docker exec nfs-client-1 mkdir -p /tmp/test-site-a;
+docker exec nfs-client-1 mount -t nfs 192.168.243.50:/ifs/data/source /tmp/test-site-a;
 docker exec nfs-client-1 touch /tmp/test-site-a/site-a-is-fenced.txt
 # Expected: mount will succeed but writes will fail with EROFS
 ```
@@ -140,17 +146,17 @@ Wait for both jobs to show **green (Successful)** in AWX Jobs view.
 
 ```bash
 # Confirm clients are back on Site A (/ifs/data/source)
-docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data
+docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data;
 docker exec nfs-client-2 findmnt -n -o SOURCE /mnt/powerscale_data
 # Expected: 192.168.243.50:/ifs/data/source
 
 # Confirm Site A is writable again
-docker exec nfs-client-1 touch /mnt/powerscale_data/post-failback-client1.txt
-docker exec nfs-client-2 touch /mnt/powerscale_data/post-failback-client2.txt
+docker exec nfs-client-1 touch /mnt/powerscale_data/post-failback-client1.txt;
+docker exec nfs-client-2 touch /mnt/powerscale_data/post-failback-client2.txt;
 docker exec nfs-client-1 ls -la /mnt/powerscale_data/
 
 # Confirm fstab is updated (persistent across reboots)
-docker exec nfs-client-1 grep powerscale /etc/fstab
+docker exec nfs-client-1 grep powerscale /etc/fstab;
 docker exec nfs-client-2 grep powerscale /etc/fstab
 # Expected: entry pointing to /ifs/data/source
 ```

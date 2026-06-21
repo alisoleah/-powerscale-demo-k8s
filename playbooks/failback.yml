@@ -89,6 +89,8 @@
         path: "/ifs/data/source"
         access_zone: "System"
         read_only: false
+        root_clients:
+          - "172.27.96.0/20"
         state: "present"
 
     - name: 4a. Fence Site B - Lock SMB Share to Read-Only
@@ -117,6 +119,8 @@
         path: "/ifs/data/target"
         access_zone: "System"
         read_only: true
+        root_clients:
+          - "172.27.96.0/20"
         state: "present"
 
     # ---------------------------------------------------------------

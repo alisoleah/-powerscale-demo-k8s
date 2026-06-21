@@ -36,7 +36,7 @@
         group:
           name: "wheel"
           provider_type: "file"
-        access_control: "0755"
+        access_control: "0777"
         recursive: true
         state: "present"
 
@@ -53,7 +53,7 @@
         group:
           name: "wheel"
           provider_type: "file"
-        access_control: "0755"
+        access_control: "0777"
         recursive: true
         state: "present"
 

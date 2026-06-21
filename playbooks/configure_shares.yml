@@ -41,6 +41,7 @@
         path: "/ifs/data/target"
         access_control: "0777"
         state: "present"
+      ignore_errors: true  # SyncIQ target path is read-only for ACL changes; permissions are set in setup_demo.yml
 
     # ---------------------------------------------------------------
     # SMARTQUOTAS (5GB Limits)

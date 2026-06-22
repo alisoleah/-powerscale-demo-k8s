@@ -30,19 +30,39 @@
         msg: "Successfully connected to Isilon at {{ isilon_host }}. Proceeding with SyncIQ failover sequence..."
 
     # ---------------------------------------------------------------
-    # STEP 3: Promote target — SyncIQ allow_write via job_params
+    # STEP 3: Promote target — POST directly to sync/jobs endpoint.
+    # synciqpolicy with state:present skips job creation when policy
+    # already exists, so we use uri to guarantee the job is triggered.
     # ---------------------------------------------------------------
     - name: 3. Execute SyncIQ Allow Write (Failover) on Policy
-      dellemc.powerscale.synciqpolicy:
-        onefs_host: "{{ isilon_host }}"
-        verify_ssl: false
-        api_user: "{{ ansible_user | default('root') }}"
-        api_password: "{{ ansible_password }}"
-        policy_name: "{{ policy_name }}"
-        job_params:
+      ansible.builtin.uri:
+        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs"
+        method: POST
+        user: "{{ ansible_user | default('root') }}"
+        password: "{{ ansible_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: json
+        body:
+          policy_name: "{{ policy_name }}"
           action: "allow_write"
-          wait_for_completion: true
-        state: "present"
+        status_code: [200, 201, 202]
+      register: allow_write_result
+
+    - name: 3b. Wait for Allow Write job to complete
+      ansible.builtin.uri:
+        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs/{{ allow_write_result.json.id }}"
+        method: GET
+        user: "{{ ansible_user | default('root') }}"
+        password: "{{ ansible_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        status_code: [200]
+      register: job_status
+      until: job_status.json.state in ['finished', 'failed', 'canceled']
+      retries: 30
+      delay: 10
+      when: allow_write_result.json.id is defined
 
     # ---------------------------------------------------------------
     # STEP 4: Fence Site A — lock source READ-ONLY (SMB + NFS)

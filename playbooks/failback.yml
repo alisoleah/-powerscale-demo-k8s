@@ -29,35 +29,40 @@
         state: "present"
 
     # ---------------------------------------------------------------
-    # STEP 2: allow_write_revert — direct complement to allow_write
-    # Releases the SyncIQ domain lock on the source path,
-    # restores target to read-only and source to writable
-    # at the kernel level (NFS export flags cannot override this lock)
+    # STEP 2: allow_write_revert — releases the SyncIQ domain lock on
+    # the source path, restores target to read-only and source to
+    # writable at the kernel level.
+    # POST directly to sync/jobs endpoint so the job is always created.
     # ---------------------------------------------------------------
     - name: 2. SyncIQ Allow Write Revert (restore original direction)
-      dellemc.powerscale.synciqpolicy:
-        onefs_host: "{{ isilon_host }}"
-        verify_ssl: false
-        api_user: "{{ ansible_user | default('root') }}"
-        api_password: "{{ ansible_password }}"
-        policy_name: "{{ policy_name }}"
-        job_params:
+      ansible.builtin.uri:
+        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs"
+        method: POST
+        user: "{{ ansible_user | default('root') }}"
+        password: "{{ ansible_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: json
+        body:
+          policy_name: "{{ policy_name }}"
           action: "allow_write_revert"
-          wait_for_completion: true
-        state: "present"
+        status_code: [200, 201, 202]
       register: revert_result
-      failed_when:
-        - revert_result.failed
-        - "'already started' not in (revert_result.msg | default(''))"
-        - "'already done' not in (revert_result.msg | default(''))"
 
-    - name: 2b. Warn if revert was skipped (policy needs manual reset)
-      debug:
-        msg: >
-          WARNING: allow_write_revert skipped — policy was already in failback state.
-          If permissions do not restore correctly, run on Isilon CLI:
-          isi sync policies reset {{ policy_name }}
-      when: revert_result.failed | default(false)
+    - name: 2b. Wait for Allow Write Revert job to complete
+      ansible.builtin.uri:
+        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs/{{ revert_result.json.id }}"
+        method: GET
+        user: "{{ ansible_user | default('root') }}"
+        password: "{{ ansible_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        status_code: [200]
+      register: job_status
+      until: job_status.json.state in ['finished', 'failed', 'canceled']
+      retries: 30
+      delay: 10
+      when: revert_result.json.id is defined
 
     # ---------------------------------------------------------------
     # STEP 3: Set NFS + SMB permissions to match restored state

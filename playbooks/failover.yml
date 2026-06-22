@@ -30,39 +30,33 @@
         msg: "Successfully connected to Isilon at {{ isilon_host }}. Proceeding with SyncIQ failover sequence..."
 
     # ---------------------------------------------------------------
-    # STEP 3: Promote target — POST directly to sync/jobs endpoint.
-    # synciqpolicy with state:present skips job creation when policy
-    # already exists, so we use uri to guarantee the job is triggered.
+    # STEP 3: Promote target — SyncIQ allow_write via Dell module.
     # ---------------------------------------------------------------
     - name: 3. Execute SyncIQ Allow Write (Failover) on Policy
-      ansible.builtin.uri:
-        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs"
-        method: POST
-        user: "{{ ansible_user | default('root') }}"
-        password: "{{ ansible_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        body_format: json
-        body:
-          policy_name: "{{ policy_name }}"
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        job_params:
           action: "allow_write"
-        status_code: [200, 201, 202]
+          wait_for_completion: true
+        state: "present"
       register: allow_write_result
 
-    - name: 3b. Wait for Allow Write job to complete
-      ansible.builtin.uri:
-        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs/{{ allow_write_result.json.id }}"
-        method: GET
-        user: "{{ ansible_user | default('root') }}"
-        password: "{{ ansible_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        status_code: [200]
-      register: job_status
-      until: job_status.json.state in ['finished', 'failed', 'canceled']
-      retries: 30
-      delay: 10
-      when: allow_write_result.json.id is defined
+    - name: 3b. Confirm Allow Write job was triggered
+      ansible.builtin.debug:
+        msg: "Allow Write result: changed={{ allow_write_result.changed }} — job {{ 'WAS' if allow_write_result.changed else 'was NOT' }} triggered"
+
+    - name: 3c. Fail if Allow Write was silently skipped
+      ansible.builtin.fail:
+        msg: >
+          allow_write job was NOT created (task returned ok with no change).
+          This is a known module idempotency issue. Check the SyncIQ policy
+          state and re-run, or run manually:
+          isi sync jobs create {{ policy_name }} --action allow_write
+      when: not allow_write_result.changed
 
     # ---------------------------------------------------------------
     # STEP 4: Fence Site A — lock source READ-ONLY (SMB + NFS)

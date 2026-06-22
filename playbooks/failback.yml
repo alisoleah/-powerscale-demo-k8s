@@ -30,39 +30,34 @@
 
     # ---------------------------------------------------------------
     # STEP 2: allow_write_revert — releases the SyncIQ domain lock on
-    # the source path, restores target to read-only and source to
-    # writable at the kernel level.
-    # POST directly to sync/jobs endpoint so the job is always created.
+    # the target path, restores source to writable and target to
+    # read-only at the kernel level.
     # ---------------------------------------------------------------
     - name: 2. SyncIQ Allow Write Revert (restore original direction)
-      ansible.builtin.uri:
-        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs"
-        method: POST
-        user: "{{ ansible_user | default('root') }}"
-        password: "{{ ansible_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        body_format: json
-        body:
-          policy_name: "{{ policy_name }}"
+      dellemc.powerscale.synciqpolicy:
+        onefs_host: "{{ isilon_host }}"
+        verify_ssl: false
+        api_user: "{{ ansible_user | default('root') }}"
+        api_password: "{{ ansible_password }}"
+        policy_name: "{{ policy_name }}"
+        job_params:
           action: "allow_write_revert"
-        status_code: [200, 201, 202]
+          wait_for_completion: true
+        state: "present"
       register: revert_result
 
-    - name: 2b. Wait for Allow Write Revert job to complete
-      ansible.builtin.uri:
-        url: "https://{{ isilon_host }}:8080/platform/3/sync/jobs/{{ revert_result.json.id }}"
-        method: GET
-        user: "{{ ansible_user | default('root') }}"
-        password: "{{ ansible_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        status_code: [200]
-      register: job_status
-      until: job_status.json.state in ['finished', 'failed', 'canceled']
-      retries: 30
-      delay: 10
-      when: revert_result.json.id is defined
+    - name: 2b. Confirm Allow Write Revert job was triggered
+      ansible.builtin.debug:
+        msg: "Allow Write Revert result: changed={{ revert_result.changed }} — job {{ 'WAS' if revert_result.changed else 'was NOT' }} triggered"
+
+    - name: 2c. Fail if Allow Write Revert was silently skipped
+      ansible.builtin.fail:
+        msg: >
+          allow_write_revert job was NOT created (task returned ok with no change).
+          This is a known module idempotency issue. Check the SyncIQ policy
+          state and re-run, or run manually:
+          isi sync jobs create {{ policy_name }} --action allow_write_revert
+      when: not revert_result.changed
 
     # ---------------------------------------------------------------
     # STEP 3: Set NFS + SMB permissions to match restored state

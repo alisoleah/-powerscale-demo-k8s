@@ -50,7 +50,7 @@ Open that URL in a browser. Login: `admin` / (password above).
 ### 0.3 Deploy NFS client containers (open a second terminal)
 
 ```bash
-cd ~/powerscale-demo-k8s
+cd ~/powerscale-demo-k8s;
 ./deploy_nfs_clients.sh
 ```
 
@@ -69,15 +69,12 @@ Run these commands to confirm clients are healthy and writing to Site A before s
 docker ps --filter name=nfs-client
 
 # Confirm both are mounted to Site A (/ifs/data/source)
-docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data
+docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data;
 docker exec nfs-client-2 findmnt -n -o SOURCE /mnt/powerscale_data
 # Expected: 192.168.243.50:/ifs/data/source
 
-# List files — both files should appear from both clients (shared NFS)
-docker exec nfs-client-1 ls -la /mnt/powerscale_data/
-```
 # Confirm read-write access
-docker exec nfs-client-1 touch /mnt/powerscale_data/client1-precheck.txt
+docker exec nfs-client-1 touch /mnt/powerscale_data/client1-precheck.txt;
 docker exec nfs-client-2 touch /mnt/powerscale_data/client2-precheck.txt
 
 # List files — both files should appear from both clients (shared NFS)
@@ -108,16 +105,10 @@ docker exec nfs-client-1 findmnt -n -o SOURCE /mnt/powerscale_data;
 docker exec nfs-client-2 findmnt -n -o SOURCE /mnt/powerscale_data
 # Expected: 192.168.243.50:/ifs/data/target
 
-
-
-###########################  make sure ssh root@192.168.243.50 "chmod 777 /ifs/data/target";   dell1234
 # Confirm Site B is writable
 docker exec nfs-client-1 touch /mnt/powerscale_data/post-failover-client1.txt;
 docker exec nfs-client-2 touch /mnt/powerscale_data/post-failover-client2.txt;
 docker exec nfs-client-1 ls -la /mnt/powerscale_data/
-
-
-
 
 # Confirm Site A is now READ-ONLY (fenced)
 docker exec nfs-client-1 mkdir -p /tmp/test-site-a;
